@@ -37,7 +37,6 @@ async def welcome(message: types.Message):
 
 @router.message_handler()
 async def render(message: types.Message):
-    print(message)
     if not message.text:
         await message.answer('Only text messages are expected.')
         return
