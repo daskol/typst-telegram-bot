@@ -64,11 +64,16 @@ def serve_api(ns: Namespace):
         ns.endpoint = f'http://{ns.interface}:{ns.port}'
         logging.info('no endpoint specified: infer it from arguments: %s',
                      ns.endpoint)
+
+    root_dir: Path = ns.root_dir
+    root_dir.mkdir(exist_ok=True, parents=True)
+    logging.info('use directory %s as a scratchpad for compilation', root_dir)
+
     from typst_telegram.api import serve
     kwargs = vars(ns)
-    return serve(host=kwargs.pop('interface'),
-                 port=kwargs.pop('port'),
-                 **kwargs)
+    kwargs.pop('root_dir')
+    return serve(host=kwargs.pop('interface'), port=kwargs.pop('port'),
+                 root_dir=root_dir, **kwargs)
 
 
 def serve_bot(ns: Namespace):
@@ -133,8 +138,8 @@ p_help = subparsers.add_parser('help', add_help=False,
 p_help.set_defaults(func=help_)
 
 # Describe subcommand `render`.
-p_render = subparsers.add_parser('render',
-    help='render formula from command line')
+p_render = subparsers.add_parser(
+    'render', help='render formula from command line')
 p_render.set_defaults(func=render)
 
 # Describe subcommand `serve`.
@@ -144,11 +149,13 @@ p_serve_subparsers = p_serve.add_subparsers()
 
 p_serve_api = p_serve_subparsers.add_parser('api', help='run rendering server')
 p_serve_api.set_defaults(func=serve_api)
+p_serve_api.add_argument('-d', '--root-dir', type=Path, default=Path('.'),
+                         help='directory for compilation files')
+p_serve_api.add_argument('-e', '--endpoint', type=str, help='service endpoint')
 p_serve_api.add_argument('-i', '--interface', default='127.0.0.1',
                          help='interface to listen')
 p_serve_api.add_argument('-p', '--port', default=8080,
                          help='interface to listen')
-p_serve_api.add_argument('-e', '--endpoint', type=str, help='service endpoint')
 
 p_serve_bot = p_serve_subparsers.add_parser('bot', help='run telegram bot')
 p_serve_bot.set_defaults(func=serve_bot)
