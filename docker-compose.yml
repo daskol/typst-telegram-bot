@@ -1,0 +1,23 @@
+version: '3.6'
+services:
+  api:
+    image: ghcr.io/daskol/typst-telegram
+    build: .
+    command: 'python -m typst_telegram serve api -d data -e http://api:8080 -i 0.0.0.0'
+    security_opt:
+      - 'no-new-privileges:true'
+    user: 'nobody:nobody'
+    volumes:
+      - './data:/workspace/data'
+
+  bot:
+    image: ghcr.io/daskol/typst-telegram
+    build: .
+    command: 'python -m typst_telegram serve bot -e http://api:8080'
+    environment:
+      - 'TELEGRAM_BOT_API_TOKEN'
+    security_opt:
+      - 'no-new-privileges:true'
+    user: 'nobody:nobody'
+    links:
+      - api
