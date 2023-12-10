@@ -71,8 +71,9 @@ def serve_api(ns: Namespace):
                  **kwargs)
 
 
-async def serve_bot(ns: Namespace):
-    raise NotImplementedError
+def serve_bot(ns: Namespace):
+    from typst_telegram.bot import serve
+    serve(ns.endpoint)
 
 
 def version(ns: Namespace):
