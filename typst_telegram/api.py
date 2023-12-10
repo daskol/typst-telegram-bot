@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 from asyncio.subprocess import PIPE, create_subprocess_exec
 from dataclasses import dataclass
 from pathlib import Path
@@ -61,5 +59,6 @@ async def get_render(request: Request):
 app = web.Application()
 app.add_routes([web.get('/ping', get_ping), web.get('/render', get_render)])
 
-if __name__ == '__main__':
-    web.run_app(app)
+
+def serve(host, port, **kwargs):
+    web.run_app(app, host=host, port=port)

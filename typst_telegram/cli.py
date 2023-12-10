@@ -59,12 +59,16 @@ def serve(ns: Namespace):
     raise RuntimeError('Unreachable execution branch.')
 
 
-async def serve_api(ns: Namespace):
+def serve_api(ns: Namespace):
     if ns.endpoint is None:
         ns.endpoint = f'http://{ns.interface}:{ns.port}'
         logging.info('no endpoint specified: infer it from arguments: %s',
                      ns.endpoint)
-    raise NotImplementedError
+    from typst_telegram.api import serve
+    kwargs = vars(ns)
+    return serve(host=kwargs.pop('interface'),
+                 port=kwargs.pop('port'),
+                 **kwargs)
 
 
 async def serve_bot(ns: Namespace):
