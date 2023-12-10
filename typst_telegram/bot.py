@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 import logging
 from hashlib import md5
 from os import getenv
@@ -17,15 +15,19 @@ FAILURE = (r'Rendering error\. First\, check '
            r'[correctness](https://typst.app/docs/reference/math/) of the '
            r'expression\; otherwise\, try again later\.')
 
-logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s',
-                    level=logging.INFO)
+RENDERING_ERROR = ('Rendering error\\(s\\)\\.\n'
+                   '```errors\n'
+                   '{errors}\n'
+                   '```')
 
 bot = Bot(token=TELEGRAM_BOT_API_TOKEN)
 router = Dispatcher(bot)
 
 
 async def on_startup(router: Dispatcher):
-    router.sess = ClientSession('http://localhost:8080')
+    endpoint = router.config['endpoint']
+    logging.info('create rendering service client: endpoint%s', endpoint)
+    router.sess = ClientSession(endpoint)
 
 
 @router.message_handler(commands=['start', 'help'])
@@ -44,11 +46,22 @@ async def render(message: types.Message):
     try:
         sess: ClientSession = router.sess
         async with sess.get('/render', params={'expr': message.text}) as res:
-            img = await res.read()
+            from http import HTTPStatus
+            if res.status == HTTPStatus.OK:
+                img = await res.read()
+            elif res.status == HTTPStatus.BAD_REQUEST:
+                json = await res.json()
+                errors = json['errors']
+                reason = '\n'.join(err['reason'] for err in errors)
+                text = RENDERING_ERROR.format(errors=reason)
+                await message.answer(text, parse_mode='MarkdownV2',
+                                     disable_web_page_preview=True)
+                return
+            else:
+                res.raise_for_status()
         await message.answer_photo(img)
     except ClientError:
-        await message.answer(FAILURE,
-                             parse_mode='MarkdownV2',
+        await message.answer(FAILURE, parse_mode='MarkdownV2',
                              disable_web_page_preview=True)
         raise
 
@@ -66,5 +79,6 @@ async def render_inline(message: types.InlineQuery):
     await bot.answer_inline_query(message.id, results=[item])
 
 
-if __name__ == '__main__':
+def serve(endpoint: str):
+    router.config = {'endpoint': endpoint}
     executor.start_polling(router, skip_updates=True, on_startup=on_startup)
