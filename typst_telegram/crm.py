@@ -2,6 +2,7 @@ import logging
 from asyncio import sleep
 from csv import DictReader, DictWriter
 from dataclasses import asdict, dataclass
+from enum import Enum
 from json import dumps
 from os import getenv
 from pathlib import Path
@@ -10,12 +11,23 @@ from typing import IO, Any, Mapping, Optional, Self
 from aiogram import Bot
 
 
+class Status(Enum):
+
+    UNKNOWN = 'unknown'
+
+    FAILED = 'failed'
+
+    SENT = 'sent'
+
+    SKIPPED = 'skipped'
+
+
 @dataclass
 class Recipient:
 
     uid: int
 
-    status: str = 'none'
+    status: str = 'unknown'
 
 
 def read_mailing_list(path: Path):
@@ -90,16 +102,17 @@ class MailingList:
 async def _announce(bot: Bot, ml: MailingList, msg: Mapping[str, Any],
                     dry_run: bool = False):
     for recipient in ml:
-        try:
-            if not dry_run:
+        if (status := recipient.status) == 'sent':
+            status = 'skipped'
+        elif not dry_run:
+            try:
                 await bot.send_message(chat_id=recipient.uid, text=msg['text'],
                                        parse_mode='MarkdownV2')
-        except Exception:
-            recipient.status = 'failed'
-        else:
-            recipient.status = 'sent'
-        finally:
-            ml.report(recipient)
+            except Exception:
+                status = 'failed'
+            else:
+                status = 'sent'
+        ml.report(recipient, status)
 
 
 async def announce(mailing_list: MailingList, message: Mapping[str, Any],
