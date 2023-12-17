@@ -5,17 +5,20 @@
 ## Overview
 
 Try [@TypstBot][1] in Telegram or deploy as follows. First, run simple HTTP API
-to `typst`. It uses `typst` and `poppler` for rendering `*.typ` to `*.pdf` and
-then to `*.png`.
+to `typst`. It uses `typst` for rendering `*.typ` to `*.png`.
 
 ```shell
-python typst.py
+typst-telegram serve api \
+    --root-dir data \
+    --endpoint http://localhost:8080 \
+    --interface 127.0.0.1
 ```
 
-Finally, one can run bot as follows.
+Finally, one can run Telegram bot itself as follows with environemnt variable
+`TELEGRAM_BOT_TOKEN` set.
 
-```
-python bot.py
+```shell
+typst-telegram serve bot --endpoint http://localhost:8080
 ```
 
 [1]: https://t.me/TypstBot
