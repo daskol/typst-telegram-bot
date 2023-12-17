@@ -97,6 +97,12 @@ async def render(message: types.Message):
                 disable_web_page_preview=True)
 
 
+@router.callback_query_handler()
+async def handle_callback_query(query: types.CallbackQuery):
+    logging.info('handle callback query: data=%s', query.data)
+    await query.message.edit_reply_markup(None)
+
+
 @router.inline_handler()
 async def render_inline(message: types.InlineQuery):
     text = message.query or 'F(x) = integral f(x) d x + C'
