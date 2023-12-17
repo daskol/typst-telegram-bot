@@ -1,11 +1,19 @@
 import logging
 from hashlib import md5
+from http import HTTPStatus
 from os import getenv
 
 from aiogram import Bot, Dispatcher, executor, types
+from aiogram.utils.exceptions import PhotoDimensions
 from aiohttp.client import ClientError, ClientSession
 
 TELEGRAM_BOT_API_TOKEN = getenv('TELEGRAM_BOT_API_TOKEN')
+
+TELEGRAM_MAX_ASPECT_RATIO = 20
+
+TELEGRAM_MAX_EDGE_SIZE = 10_000  # width + height
+
+TELEGRAM_MAX_IMAGE_SIZE = 10485760  # 10Mb
 
 
 GREATINGS = (r'Hi\! I\'m @TypstBot\! I render math expressions written in '
@@ -19,6 +27,18 @@ RENDERING_ERROR = ('Rendering error\\(s\\)\\.\n'
                    '```errors\n'
                    '{errors}\n'
                    '```')
+
+IMAGE_TOO_LARGE_ERROR = (
+    r'⚠️ Resulting image exceeds Telegram\'s limit at 10Mb (see [Telegram Bot '
+    r'API](https://core.telegram.org/bots/api#sendphoto))\.')
+
+IMAGE_BAD_SHAPE_ERROR = (
+    '⚠️ Resulting image exceeds Telegram\'s limit: '
+    '\\(a\\) aspect ratio ≤ 20 and '
+    '\\(b\\) width/height ≤ 10k pixels \\(see [Telegram Bot API]'
+    '(https://core.telegram.org/bots/api#sendphoto)\\)\\.\n'
+    '\n'
+    'Try to wrap your equation on new line with backslash \\(\\\\\\)\\.')
 
 bot = Bot(token=TELEGRAM_BOT_API_TOKEN)
 router = Dispatcher(bot)
@@ -46,7 +66,6 @@ async def render(message: types.Message):
     try:
         sess: ClientSession = router.sess
         async with sess.get('/render', params={'expr': message.text}) as res:
-            from http import HTTPStatus
             if res.status == HTTPStatus.OK:
                 img = await res.read()
             elif res.status == HTTPStatus.BAD_REQUEST:
@@ -59,11 +78,23 @@ async def render(message: types.Message):
                 return
             else:
                 res.raise_for_status()
-        await message.answer_photo(img)
     except ClientError:
         await message.answer(FAILURE, parse_mode='MarkdownV2',
                              disable_web_page_preview=True)
         raise
+
+    # At this point we assume that we have a valid image ready to send back to
+    # user. The final issue is to check image limits.
+    if len(img) > TELEGRAM_MAX_IMAGE_SIZE:
+        await message.answer(IMAGE_TOO_LARGE_ERROR, parse_mode='MarkdownV2',
+                             disable_web_page_preview=True)
+    else:
+        try:
+            await message.answer_photo(img)
+        except PhotoDimensions:
+            await message.answer(
+                IMAGE_BAD_SHAPE_ERROR, parse_mode='MarkdownV2',
+                disable_web_page_preview=True)
 
 
 @router.inline_handler()
