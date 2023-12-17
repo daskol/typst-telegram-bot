@@ -110,13 +110,20 @@ class MailingList:
 
 async def _announce(bot: Bot, ml: MailingList, msg: Mapping[str, Any],
                     dry_run: bool = False):
+    disable_web_page_preview = msg.get('disable_web_page_preview')
     for recipient in ml:
         if (status := recipient.status) == 'sent':
             status = 'skipped'
         elif not dry_run:
             try:
-                await bot.send_message(chat_id=recipient.uid, text=msg['text'],
-                                       parse_mode='MarkdownV2')
+                await bot.send_message(
+                    chat_id=recipient.uid,
+                    text=msg['text'],
+                    parse_mode='MarkdownV2',
+                    reply_markup=msg.get('reply_markup'),
+                    disable_web_page_preview=disable_web_page_preview,
+                    disable_notification=msg.get('disable_notification'),
+                )
             except Exception:
                 status = 'failed'
             else:
