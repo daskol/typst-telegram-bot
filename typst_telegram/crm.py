@@ -1,5 +1,6 @@
 import logging
 from asyncio import sleep
+from collections import defaultdict
 from csv import DictReader, DictWriter
 from dataclasses import asdict, dataclass
 from enum import Enum
@@ -29,6 +30,10 @@ class Recipient:
 
     status: str = 'unknown'
 
+    def __post_init__(self):
+        if self.status not in ('unknown', 'failed', 'sent', 'skipped'):
+            self.status = 'unknown'
+
 
 def read_mailing_list(path: Path):
     with open(path) as fin:
@@ -48,6 +53,7 @@ class MailingList:
         self.fp_output = fp_output
         self.offset = 0
         self.writer: Optional[DictWriter] = None
+        self.stats = defaultdict(int)
 
     def __del__(self):
         self.close()
@@ -85,6 +91,12 @@ class MailingList:
         return cls(recipients, fp_output)
 
     def report(self, recipient: Recipient, status: Optional[str] = None):
+        # Update status statistics.
+        row = asdict(recipient)
+        if status is not None:
+            row['status'] = status
+        self.stats[row['status']] += 1
+
         # If there is no output file for logging statuses then just exit.
         if self.fp_output is None:
             return self
@@ -93,9 +105,6 @@ class MailingList:
             self.writer = DictWriter(self.fp_output, ['uid', 'status'])
             self.writer.writeheader()
         # If there is explicit status then uses recipient status.
-        row = asdict(recipient)
-        if status is not None:
-            row['status'] = status
         self.writer.writerow(row)
 
 
@@ -121,7 +130,7 @@ async def announce(mailing_list: MailingList, message: Mapping[str, Any],
     bot = Bot(token=bot_token)
     pos = bot_token.find(':')
     pos = max(pos, 8)
-    logging.info('use bot token %s:...', bot_token[:pos])
+    logging.info('use bot token %s:***', bot_token[:pos])
 
     info = dict(await bot.get_me())
     logging.info('bot info is %s', dumps(info, ensure_ascii=False, indent=2))
@@ -138,6 +147,8 @@ async def announce(mailing_list: MailingList, message: Mapping[str, Any],
         logging.info('start sending notifications')
 
     try:
-        return await _announce(bot, mailing_list, message, dry_run)
+        await _announce(bot, mailing_list, message, dry_run)
     finally:
         await (await bot.get_session()).close()
+
+    logging.info('sending statistics: %s', dumps(mailing_list.stats))
