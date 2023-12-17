@@ -1,8 +1,10 @@
 import logging
 import sys
-from argparse import ArgumentParser, ArgumentTypeError, FileType, Namespace
+from argparse import (ArgumentParser, ArgumentTypeError, BooleanOptionalAction,
+                      FileType, Namespace)
 from asyncio import run
 from inspect import iscoroutinefunction
+from json import load
 from pathlib import Path
 from sys import stderr
 
@@ -47,12 +49,20 @@ class PathType:
         return path
 
 
-def render(ns: Namespace):
-    raise NotImplementedError
+async def announce(ns: Namespace):
+    from typst_telegram.crm import MailingList, announce
+    ml = MailingList.from_paths(ns.recipients, ns.output)
+    with open(ns.message) as fin:
+        msg = load(fin)
+    await announce(ml, msg, dry_run=ns.dry_run)
 
 
 def help_(args: Namespace):
     parser.print_help()
+
+
+def render(ns: Namespace):
+    raise NotImplementedError
 
 
 def serve(ns: Namespace):
@@ -120,17 +130,30 @@ parser.add_argument('-c', '--config', default=None, type=str,
 
 # Describe `connection` group.
 g_log = parser.add_argument_group('logging options')
-
 g_log.add_argument(
     '--log-level', default='info', choices=sorted(LOG_LEVELS.keys()),
     help='set logger verbosity level')
-
 g_log.add_argument(
     '--log-output', default=stderr, metavar='FILENAME', type=FileType('w'),
     help='set output file or stderr (-) for logging')
 
 # Describe subparsers for subcommands.
 subparsers = parser.add_subparsers()
+
+# Describe subcommand `announce`.
+p_announce = subparsers.add_parser(
+    'announce', help='send a broadcast message to users',
+    description='Broadcast a notification message or news to a user.')
+p_announce.set_defaults(func=announce)
+p_announce.add_argument(
+    '--dry-run', default=False, action=BooleanOptionalAction,
+    help='actualy send nothing')
+p_announce.add_argument('-o', '--output', type=Path,
+                        help='path to file with sending statuses')
+p_announce.add_argument('message', type=Path,
+                        help='path to JSON-formatted message to send')
+p_announce.add_argument('recipients', type=Path,
+                        help='CSV-formatted mailing list')
 
 # Describe subcommand `help`.
 p_help = subparsers.add_parser('help', add_help=False,
