@@ -1,0 +1,49 @@
+name: Pull Request Checks
+
+# Trigger the workflow on push or pull request (only main branch).
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          cache: 'pip'
+          python-version: 3.12
+      - uses: pre-commit/action@v3.0.0
+        with:
+          extra_args: ''
+
+  build:
+    name: Build and test py${{ matrix.python-version }} on ${{ matrix.os }}
+    needs: 'lint'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: ['ubuntu-latest']
+        python-version: ['3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up py${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          python -m pip install -U pip
+          pip install .[dev]
+      - name: Run tests
+        run: |
+          pytest -vv
