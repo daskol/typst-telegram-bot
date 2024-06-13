@@ -10,7 +10,7 @@ from tempfile import TemporaryDirectory
 from typing import Any
 
 EXPR_TEMPLATE = """\
-#set page(width: auto, height: auto, margin: (x: 0pt, y: 0pt))
+#set page(width: auto, height: auto, margin: {margin})
 $ {expr} $
 """
 
@@ -58,6 +58,8 @@ class Context:
 
     mimetype: str = 'image/png'
 
+    margin: str = '0.3em'
+
     async def render(self, expr: str):
         with TemporaryDirectory(dir=self.root_dir) as tmpdir:
             return await self.render_at(expr, Path(tmpdir))
@@ -67,7 +69,7 @@ class Context:
         path_png = root_dir / 'main.png'
 
         with open(path_typ, 'w') as fout:
-            fout.write(EXPR_TEMPLATE.format(expr=expr))
+            fout.write(EXPR_TEMPLATE.format(expr=expr, margin=self.margin))
 
         cmd = ('typst', 'compile', '--diagnostic-format=short', '--format=png',
                f'--ppi={self.dpi}', path_typ, path_png)
