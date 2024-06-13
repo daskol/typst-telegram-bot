@@ -1,7 +1,7 @@
 version: '3.6'
 services:
   api:
-    image: ghcr.io/daskol/typst-telegram
+    image: ghcr.io/daskol/typst-telegram-bot
     build: .
     command: 'python -m typst_telegram serve api -d data -e http://api:8080 -i 0.0.0.0'
     security_opt:
@@ -11,7 +11,7 @@ services:
       - './data:/workspace/data'
 
   bot:
-    image: ghcr.io/daskol/typst-telegram
+    image: ghcr.io/daskol/typst-telegram-bot
     build: .
     command: 'python -m typst_telegram serve bot -e http://api:8080'
     environment:
