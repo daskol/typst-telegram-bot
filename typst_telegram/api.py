@@ -14,12 +14,16 @@ async def get_ping(request):
 
 
 async def get_render(request: Request):
-    expr = request.query.get('expr')
-    if len(expr) > EXPR_MAX_SIZE:
+    if (expr := request.query.get('expr')) is None:
+        json = {'error': 'Empty or missing query parameter "expr".'}
+        body = dumps(json, ensure_ascii=False)
+        raise HTTPBadRequest(body=body, content_type='application/json')
+    elif len(expr) > EXPR_MAX_SIZE:
         raise HTTPRequestEntityTooLarge(EXPR_MAX_SIZE, len(expr))
 
     config: dict[str, Any] = request.app.config
-    context = Context(root_dir=config['root_dir'])
+    context = Context(root_dir=config['root_dir'], dpi=config.get('ppi'),
+                      margin=config.get('margin'))
 
     try:
         img = await context.render(expr)
@@ -33,6 +37,7 @@ app = web.Application()
 app.add_routes([web.get('/ping', get_ping), web.get('/render', get_render)])
 
 
-def serve(host, port, root_dir: Path = Path('.'), **kwargs):
-    app.config = {'root_dir': root_dir}
+def serve(host, port, root_dir: Path = Path('.'),
+          render_config: dict[str, Any] = {}, **kwargs):
+    app.config = {'root_dir': root_dir, **render_config}
     web.run_app(app, host=host, port=port)

@@ -1,4 +1,5 @@
 import logging
+import re
 import sys
 from argparse import (ArgumentParser, ArgumentTypeError, BooleanOptionalAction,
                       FileType, Namespace)
@@ -49,6 +50,25 @@ class PathType:
         return path
 
 
+class LengthType:
+
+    ABSOLUTES = ('pt', 'mm', 'cm', 'in')
+
+    RELATIVES = ('em',)
+
+    SUFFIX = re.compile(r'(.*)(' + '|'.join(ABSOLUTES + RELATIVES) + r')')
+
+    def __call__(self, value: str) -> str:
+        if (m := LengthType.SUFFIX.match(value)) is None:
+            raise ArgumentTypeError(f'unknown length unit: {value}')
+        try:
+            prefix: str = m.group(1)
+            float(prefix)
+        except ValueError:
+            raise ArgumentTypeError(f'unknown length unit: {value}')
+        return value
+
+
 async def announce(ns: Namespace):
     from typst_telegram.crm import MailingList, announce
     ml = MailingList.from_paths(ns.recipients, ns.output)
@@ -79,11 +99,16 @@ def serve_api(ns: Namespace):
     root_dir.mkdir(exist_ok=True, parents=True)
     logging.info('use directory %s as a scratchpad for compilation', root_dir)
 
-    from typst_telegram.api import serve
     kwargs = vars(ns)
     kwargs.pop('root_dir')
+
+    render_config = {}
+    for key in ('ppi', 'margin'):
+        render_config[key] = kwargs[f'render_{key}']
+
+    from typst_telegram.api import serve
     return serve(host=kwargs.pop('interface'), port=kwargs.pop('port'),
-                 root_dir=root_dir, **kwargs)
+                 root_dir=root_dir, render_config=render_config, **kwargs)
 
 
 def serve_bot(ns: Namespace):
@@ -179,6 +204,13 @@ p_serve_api.add_argument('-i', '--interface', default='127.0.0.1',
                          help='interface to listen')
 p_serve_api.add_argument('-p', '--port', default=8080,
                          help='interface to listen')
+
+g_render = p_serve_api.add_argument_group('redering options')
+g_render.add_argument(
+    '--render-ppi', type=int, default=288, help='points per inch')
+g_render.add_argument(
+    '--render-margin', type=LengthType(), default='0.3em',
+    help='space around equation (e.g. 0pt, 0.5em)')
 
 p_serve_bot = p_serve_subparsers.add_parser('bot', help='run telegram bot')
 p_serve_bot.set_defaults(func=serve_bot)
