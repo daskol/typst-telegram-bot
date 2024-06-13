@@ -37,7 +37,7 @@ dependencies = ["aiogram", "aiohttp"]
 requires-python = ">=3.11,<4"
 
 [project.optional-dependencies]
-dev = ["flake8", "isort", "pytest>=7"]
+dev = ["isort", "pytest>=7"]
 
 [project.scripts]
 typst-telegram = "typst_telegram.cli:main"
@@ -49,11 +49,13 @@ Repository = "https://github.com/daskol/typst-telegram-bot.git"
 [tool.isort]
 
 [tool.pytest.ini_options]
-minversion = "7.0"
-addopts = "-ra -q"
 testpaths = ["typst_telegram"]
-markers = [ ]
+minversion = "7.0"
+addopts = "-ra -q -m 'not slow'"
 filterwarnings = ["ignore::DeprecationWarning"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
 
 [tool.setuptools]
 zip-safe = true
