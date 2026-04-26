@@ -7,6 +7,9 @@ services:
     security_opt:
       - 'no-new-privileges:true'
     user: 'nobody:nobody'
+    read_only: true
+    tmpfs:
+      - /tmp
     volumes:
       - './data:/workspace/data'
     networks:
@@ -26,6 +29,9 @@ services:
     security_opt:
       - 'no-new-privileges:true'
     user: 'nobody:nobody'
+    read_only: true
+    tmpfs:
+      - /tmp
     networks:
       - internal
     deploy:
