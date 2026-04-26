@@ -111,9 +111,13 @@ def serve_api(ns: Namespace):
                  root_dir=root_dir, render_config=render_config, **kwargs)
 
 
-def serve_bot(ns: Namespace):
+async def serve_bot(ns: Namespace):
     from typst_telegram.bot import serve
-    serve(ns.endpoint)
+    from typst_telegram.stats import UserStats
+    stats = None
+    if ns.stats_file is not None:
+        stats = UserStats(ns.stats_file)
+    await serve(ns.endpoint, stats=stats)
 
 
 def version(ns: Namespace):
@@ -217,6 +221,9 @@ p_serve_bot.set_defaults(func=serve_bot)
 p_serve_bot.add_argument(
     '-e', '--endpoint', type=str, default='http://localhost:8080',
     help='rendering service endpoint')
+p_serve_bot.add_argument(
+    '-s', '--stats-file', type=Path, default=None, metavar='PATH',
+    help='base path for user stats CSV files')
 
 # Describe subcommand `version`.
 p_version = subparsers.add_parser('version', add_help=False,

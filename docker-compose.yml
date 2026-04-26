@@ -22,7 +22,7 @@ services:
   bot:
     image: ghcr.io/daskol/typst-telegram-bot:0.2.1
     build: .
-    command: 'python -m typst_telegram serve bot -e http://api:8080'
+    command: 'python -m typst_telegram serve bot -e http://api:8080 -s stats/users.csv'
     environment:
       - 'TELEGRAM_BOT_API_TOKEN'
     security_opt:
@@ -31,6 +31,8 @@ services:
     read_only: true
     tmpfs:
       - /tmp
+    volumes:
+      - './stats:/workspace/stats'
     networks:
       - internal
     deploy:
