@@ -9,6 +9,13 @@ services:
     user: 'nobody:nobody'
     volumes:
       - './data:/workspace/data'
+    networks:
+      - internal
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
 
   bot:
     image: ghcr.io/daskol/typst-telegram-bot:0.2.1
@@ -19,5 +26,14 @@ services:
     security_opt:
       - 'no-new-privileges:true'
     user: 'nobody:nobody'
-    links:
-      - api
+    networks:
+      - internal
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+networks:
+  internal:
+    driver: bridge
