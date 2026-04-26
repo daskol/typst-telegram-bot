@@ -8,6 +8,8 @@ from aiohttp.web import (HTTPBadRequest, HTTPRequestEntityTooLarge, Request,
 
 from typst_telegram.render import EXPR_MAX_SIZE, Context, RenderingError
 
+MIME = {'jpeg': 'image/jpeg', 'png': 'image/png'}
+
 
 async def get_ping(request):
     return Response(text='Pong.\n')
@@ -21,16 +23,25 @@ async def get_render(request: Request):
     elif len(expr) > EXPR_MAX_SIZE:
         raise HTTPRequestEntityTooLarge(EXPR_MAX_SIZE, len(expr))
 
+    accept = request.headers.get('Accept', 'image/jpeg')
+    if accept.startswith('image/png'):
+        fmt = 'png'
+    elif accept.startswith('image/jpeg') or accept == '*/*':
+        fmt = 'jpeg'
+    else:
+        desc = f'Unexpected "Accept" header: {accept}.\n'
+        raise HTTPBadRequest(body=desc, content_type='text/plain')
+
     config: dict[str, Any] = request.app.config
     context = Context(root_dir=config['root_dir'], dpi=config.get('ppi'),
                       margin=config.get('margin'))
 
     try:
-        img = await context.render(expr)
+        img = await context.render(expr, format=fmt)
     except RenderingError as e:
         json = dumps(e.to_dict(), ensure_ascii=False)
         raise HTTPBadRequest(body=json, content_type='application/json') from e
-    return Response(body=img)
+    return Response(body=img, content_type=MIME[fmt])
 
 
 app = web.Application()

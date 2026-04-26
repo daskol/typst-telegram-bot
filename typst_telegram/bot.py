@@ -2,6 +2,7 @@ import logging
 from hashlib import md5
 from http import HTTPStatus
 from os import getenv
+from urllib.parse import quote
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.exceptions import TelegramBadRequest
@@ -108,23 +109,29 @@ async def handle_callback_query(query: types.CallbackQuery):
 
 
 @router.inline_query()
-async def render_inline(message: types.InlineQuery,
+async def render_inline(message: types.InlineQuery, public_url: str,
                         stats: UserStats | None = None):
     if stats is not None and message.from_user is not None:
         stats.record(message.from_user.id, message.from_user.username,
                      message.from_user.first_name)
     text = message.query or 'F(x) = integral f(x) d x + C'
-    input_content = types.InputTextMessageContent(message_text=text)
     result_id: str = md5(text.encode()).hexdigest()
-    item = types.InlineQueryResultArticle(
+    photo_url = f'{public_url}/render?expr={quote(text, safe="")}'
+    item = types.InlineQueryResultPhoto(
         id=result_id,
         title=text,
-        input_message_content=input_content,
+        photo_url=photo_url,
+        thumbnail_url=photo_url,
+        cache_time=600,
     )
     await message.answer(results=[item])
 
 
-async def serve(endpoint: str, stats: UserStats | None = None):
+
+async def serve(endpoint: str, public_url: str,
+                stats: UserStats | None = None):
     async with ClientSession(endpoint) as sess:
-        await router.start_polling(bot, skip_updates=True, sess=sess,
-                                   stats=stats)
+        mask = ['message', 'callback_query', 'inline_query']
+        await router.start_polling(
+            bot, skip_updates=True, allowed_updates=mask, sess=sess,
+            stats=stats, public_url=public_url)

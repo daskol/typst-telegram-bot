@@ -27,7 +27,7 @@ RUN --mount=type=cache,target=/var/cache/pacman/pkg,sharing=locked \
     pacman -Sy --noconfirm archlinux-keyring && \
     pacman -Su --noconfirm && \
     pacman -S --noconfirm \
-        python-aiogram typst \
+        python-aiogram python-pillow typst \
         fontconfig ttf-dejavu ttf-roboto tex-gyre-fonts \
         noto-fonts noto-fonts-cjk noto-fonts-extra
 
