@@ -3,9 +3,13 @@ from hashlib import md5
 from http import HTTPStatus
 from os import getenv
 
-from aiogram import Bot, Dispatcher, executor, types
-from aiogram.utils.exceptions import PhotoDimensions
+from aiogram import Bot, Dispatcher, types
+from aiogram.exceptions import TelegramBadRequest
+from aiogram.filters import Command
+from aiogram.types import BufferedInputFile, LinkPreviewOptions
 from aiohttp.client import ClientError, ClientSession
+
+from typst_telegram.stats import UserStats
 
 TELEGRAM_BOT_API_TOKEN = getenv('TELEGRAM_BOT_API_TOKEN')
 
@@ -40,31 +44,31 @@ IMAGE_BAD_SHAPE_ERROR = (
     '\n'
     'Try to wrap your equation on new line with backslash \\(\\\\\\)\\.')
 
+NO_PREVIEW = LinkPreviewOptions(is_disabled=True)
+
 bot = Bot(token=TELEGRAM_BOT_API_TOKEN)
-router = Dispatcher(bot)
+router = Dispatcher()
 
 
-async def on_startup(router: Dispatcher):
-    endpoint = router.config['endpoint']
-    logging.info('create rendering service client: endpoint%s', endpoint)
-    router.sess = ClientSession(endpoint)
-
-
-@router.message_handler(commands=['start', 'help'])
+@router.message(Command('start', 'help'))
 async def welcome(message: types.Message):
     await message.answer(GREATINGS,
                          parse_mode='MarkdownV2',
-                         disable_web_page_preview=True)
+                         link_preview_options=NO_PREVIEW)
 
 
-@router.message_handler()
-async def render(message: types.Message):
+@router.message()
+async def render(message: types.Message, sess: ClientSession,
+                 stats: UserStats | None = None):
+    if stats is not None and message.from_user is not None:
+        stats.record(message.from_user.id, message.from_user.username,
+                     message.from_user.first_name)
+
     if not message.text:
         await message.answer('Only text messages are expected.')
         return
 
     try:
-        sess: ClientSession = router.sess
         async with sess.get('/render', params={'expr': message.text}) as res:
             if res.status == HTTPStatus.OK:
                 img = await res.read()
@@ -74,48 +78,53 @@ async def render(message: types.Message):
                 reason = '\n'.join(err['reason'] for err in errors)
                 text = RENDERING_ERROR.format(errors=reason)
                 await message.answer(text, parse_mode='MarkdownV2',
-                                     disable_web_page_preview=True)
+                                     link_preview_options=NO_PREVIEW)
                 return
             else:
                 res.raise_for_status()
     except ClientError:
         await message.answer(FAILURE, parse_mode='MarkdownV2',
-                             disable_web_page_preview=True)
+                             link_preview_options=NO_PREVIEW)
         raise
 
     # At this point we assume that we have a valid image ready to send back to
     # user. The final issue is to check image limits.
     if len(img) > TELEGRAM_MAX_IMAGE_SIZE:
         await message.answer(IMAGE_TOO_LARGE_ERROR, parse_mode='MarkdownV2',
-                             disable_web_page_preview=True)
+                             link_preview_options=NO_PREVIEW)
     else:
         try:
-            await message.answer_photo(img)
-        except PhotoDimensions:
+            await message.answer_photo(BufferedInputFile(img, 'render.png'))
+        except TelegramBadRequest:
             await message.answer(
                 IMAGE_BAD_SHAPE_ERROR, parse_mode='MarkdownV2',
-                disable_web_page_preview=True)
+                link_preview_options=NO_PREVIEW)
 
 
-@router.callback_query_handler()
+@router.callback_query()
 async def handle_callback_query(query: types.CallbackQuery):
     logging.info('handle callback query: data=%s', query.data)
-    await query.message.edit_reply_markup(None)
+    await query.message.edit_reply_markup(reply_markup=None)
 
 
-@router.inline_handler()
-async def render_inline(message: types.InlineQuery):
+@router.inline_query()
+async def render_inline(message: types.InlineQuery,
+                        stats: UserStats | None = None):
+    if stats is not None and message.from_user is not None:
+        stats.record(message.from_user.id, message.from_user.username,
+                     message.from_user.first_name)
     text = message.query or 'F(x) = integral f(x) d x + C'
-    input_content = types.InputTextMessageContent(text)
+    input_content = types.InputTextMessageContent(message_text=text)
     result_id: str = md5(text.encode()).hexdigest()
     item = types.InlineQueryResultArticle(
         id=result_id,
         title=text,
         input_message_content=input_content,
     )
-    await bot.answer_inline_query(message.id, results=[item])
+    await message.answer(results=[item])
 
 
-def serve(endpoint: str):
-    router.config = {'endpoint': endpoint}
-    executor.start_polling(router, skip_updates=True, on_startup=on_startup)
+async def serve(endpoint: str, stats: UserStats | None = None):
+    async with ClientSession(endpoint) as sess:
+        await router.start_polling(bot, skip_updates=True, sess=sess,
+                                   stats=stats)
