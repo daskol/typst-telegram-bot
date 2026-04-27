@@ -117,7 +117,7 @@ async def serve_bot(ns: Namespace):
     stats = None
     if ns.stats_file is not None:
         stats = UserStats(ns.stats_file)
-    await serve(ns.endpoint, stats=stats)
+    await serve(ns.endpoint, ns.public_url, stats=stats)
 
 
 def version(ns: Namespace):
@@ -221,6 +221,9 @@ p_serve_bot.set_defaults(func=serve_bot)
 p_serve_bot.add_argument(
     '-e', '--endpoint', type=str, default='http://localhost:8080',
     help='rendering service endpoint')
+p_serve_bot.add_argument(
+    '--public-url', type=str, required=True, metavar='URL',
+    help='public base URL of the server (e.g. https://example.com)')
 p_serve_bot.add_argument(
     '-s', '--stats-file', type=Path, default=None, metavar='PATH',
     help='base path for user stats CSV files')

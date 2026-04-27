@@ -5,9 +5,12 @@ from asyncio.subprocess import PIPE, create_subprocess_exec
 from codecs import getincrementaldecoder
 from dataclasses import dataclass
 from functools import partial
+from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
+
+from PIL import Image
 
 EXPR_TEMPLATE = """\
 #set page(width: auto, height: auto, margin: {margin})
@@ -56,15 +59,14 @@ class Context:
 
     dpi: int = 300
 
-    mimetype: str = 'image/png'
-
     margin: str = '0.3em'
 
-    async def render(self, expr: str):
+    async def render(self, expr: str, format: str = 'jpeg') -> bytes:
         with TemporaryDirectory(dir=self.root_dir) as tmpdir:
-            return await self.render_at(expr, Path(tmpdir))
+            return await self.render_at(expr, Path(tmpdir), format=format)
 
-    async def render_at(self, expr: str, root_dir: Path):
+    async def render_at(self, expr: str, root_dir: Path,
+                        format: str = 'jpeg') -> bytes:
         path_typ = root_dir / 'main.typ'
         path_png = root_dir / 'main.png'
 
@@ -89,4 +91,12 @@ class Context:
             raise RenderingError(**kwargs)
 
         with open(path_png, 'rb') as fout:
-            return fout.read()
+            data = fout.read()
+
+        if format == 'jpeg':
+            img = Image.open(BytesIO(data)).convert('RGB')
+            buf = BytesIO()
+            img.save(buf, format='JPEG', quality=90)
+            data = buf.getvalue()
+
+        return data

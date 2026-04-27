@@ -33,7 +33,7 @@ classifiers = [
     "Topic :: Utilities",
     "Typing :: Typed",
 ]
-dependencies = ["aiogram>=3", "aiohttp"]
+dependencies = ["aiogram>=3", "aiohttp", "pillow"]
 requires-python = ">=3.11,<4"
 
 [project.optional-dependencies]

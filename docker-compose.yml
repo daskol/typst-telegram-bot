@@ -3,6 +3,8 @@ services:
     image: ghcr.io/daskol/typst-telegram-bot:0.2.1
     build: .
     command: 'python -m typst_telegram serve api -d data -e http://api:8080 -i 0.0.0.0'
+    ports:
+      - '127.0.0.1:8080:8080'
     security_opt:
       - 'no-new-privileges:true'
     user: 'nobody:nobody'
